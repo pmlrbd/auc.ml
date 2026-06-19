@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Coherence Under Commitment (CUC): a dual-query evaluation paradigm exposing vacuous coherence in LLM logical reasoning. EMM-QA Workshop, ICML 2026.">
+<meta property="og:title" content="Coherence Under Commitment · ICML 2026">
+<meta property="og:description" content="A model that never answers can appear perfectly coherent. CUC exposes this trap by jointly measuring negation-consistency and epistemic commitment.">
+<title>Coherence Under Commitment · EMM-QA @ ICML 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --c-ink:        #0C1320;
+  --c-ink2:       #152035;
+  --c-body:       #F4F5FA;
+  --c-white:      #FFFFFF;
+  --c-blue:       #1D52CC;
+  --c-blue-lt:    #4B7CF3;
+  --c-amber:      #D97706;
+  --c-amber-lt:   #FCD34D;
+  --c-rose:       #DC2626;
+  --c-rose-lt:    #FCA5A5;
+  --c-green:      #059669;
+  --c-green-lt:   #34D399;
+  --c-violet:     #6D28D9;
+  --c-violet-lt:  #A78BFA;
+  --c-text:       #111827;
+  --c-mid:        #374151;
+  --c-muted:      #6B7280;
+  --c-border:     #E5E7EB;
+  --f-display:    'Space Grotesk', system-ui, sans-serif;
+  --f-body:       'Lora', Georgia, serif;
+  --f-mono:       'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* ── RESET ───────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--f-body); color: var(--c-text); background: var(--c-body); line-height: 1.75; }
+a { text-decoration: none; }
+sup,sub { font-size: 0.65em; line-height: 0; position: relative; vertical-align: baseline; }
+sup { top: -0.5em; } sub { bottom: -0.25em; }
+strong { font-weight: 600; }
+p { color: var(--c-mid); }
+p + p { margin-top: 0.875rem; }
+
+/* ── NAV ─────────────────────────────────────────────────── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+  background: rgba(12,19,32,0.94);
+  backdrop-filter: blur(14px) saturate(160%);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.nav-inner {
+  max-width: 1140px; margin: 0 auto;
+  display: flex; align-items: center; gap: 2rem;
+  padding: 0.75rem 1.5rem;
+}
+.nav-logo {
+  font-family: var(--f-display); font-weight: 700; font-size: 1.0625rem;
+  color: var(--c-blue-lt); letter-spacing: 0.06em; flex-shrink: 0;
+}
+.nav-links { display: flex; gap: 1.5rem; flex: 1; }
+.nav-links a {
+  font-family: var(--f-display); font-size: 0.8125rem; font-weight: 500;
+  color: rgba(255,255,255,0.55); transition: color 0.15s;
+}
+.nav-links a:hover { color: #fff; }
+.nav-acts { display: flex; gap: 0.625rem; }
+.nav-btn {
+  font-family: var(--f-display); font-size: 0.7875rem; font-weight: 600;
+  padding: 0.35rem 0.875rem; border-radius: 6px; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 0.375rem;
+}
+.nav-btn-ghost { color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.18); }
+.nav-btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.45); }
+.nav-btn-solid { background: var(--c-blue-lt); color: #fff; }
+.nav-btn-solid:hover { background: #3a6be0; }
+
+/* ── HERO ────────────────────────────────────────────────── */
+.hero {
+  background: var(--c-ink);
+  padding: 132px 1.5rem 72px;
+  position: relative; overflow: hidden;
+}
+/* Radial glows */
+.hero::before {
+  content: '';
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 60% at 72% 45%, rgba(75,124,243,0.13) 0%, transparent 70%),
+    radial-gradient(ellipse 35% 45% at 20% 85%, rgba(29,82,204,0.09) 0%, transparent 65%);
+}
+/* Watermark formula */
+.hero-wm {
+  position: absolute; right: -1rem; top: 50%; transform: translateY(-50%);
+  font-family: var(--f-mono); font-size: clamp(5rem, 9vw, 10rem);
+  color: rgba(75,124,243,0.035); white-space: nowrap; pointer-events: none;
+  user-select: none; line-height: 1; font-weight: 500;
+}
+.hero-inner {
+  max-width: 1140px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  background: rgba(75,124,243,0.14); border: 1px solid rgba(75,124,243,0.32);
+  border-radius: 100px; padding: 0.275rem 0.875rem;
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 700;
+  color: var(--c-blue-lt); letter-spacing: 0.07em; text-transform: uppercase;
+  margin-bottom: 1.25rem;
+}
+.hero-badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--c-blue-lt); }
+.hero-title {
+  font-family: var(--f-display); font-size: clamp(2.25rem, 4vw, 3.375rem);
+  font-weight: 700; line-height: 1.08; color: #fff; margin-bottom: 0.75rem;
+}
+.hero-subtitle {
+  font-family: var(--f-display); font-size: 1rem; font-weight: 400;
+  color: rgba(255,255,255,0.48); line-height: 1.55; margin-bottom: 1.5rem;
+}
+.hero-authors {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.75rem;
+  margin-bottom: 0.3rem;
+}
+.hero-author { font-family: var(--f-display); font-size: 0.9375rem; font-weight: 600; color: rgba(255,255,255,0.82); }
+.hero-author-sep { color: rgba(255,255,255,0.25); font-size: 1.1rem; }
+.hero-affil { font-family: var(--f-display); font-size: 0.7875rem; color: rgba(255,255,255,0.35); margin-bottom: 1.75rem; }
+.hero-btns { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+.hero-btn {
+  font-family: var(--f-display); font-size: 0.875rem; font-weight: 600;
+  padding: 0.6rem 1.25rem; border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.18s;
+}
+.hero-btn-primary { background: var(--c-blue-lt); color: #fff; }
+.hero-btn-primary:hover { background: #3a6be0; transform: translateY(-1px); }
+.hero-btn-outline { border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.75); }
+.hero-btn-outline:hover { border-color: rgba(255,255,255,0.5); color: #fff; transform: translateY(-1px); }
+
+/* Frontier viz panel */
+.hero-viz {
+  background: rgba(255,255,255,0.026);
+  border: 1px solid rgba(255,255,255,0.075);
+  border-radius: 16px; padding: 1.125rem 1rem 0.875rem;
+  position: relative;
+}
+.hero-viz-title {
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 700;
+  color: rgba(255,255,255,0.33); text-transform: uppercase; letter-spacing: 0.09em;
+  margin-bottom: 0.625rem; text-align: center;
+}
+#frontier-svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+/* Full-width finding callout */
+.hero-finding {
+  grid-column: 1 / -1;
+  background: rgba(220,38,38,0.07); border: 1px solid rgba(220,38,38,0.22);
+  border-radius: 10px; padding: 0.875rem 1.25rem;
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  font-family: var(--f-display); font-size: 0.9375rem;
+  color: rgba(255,255,255,0.72); line-height: 1.5; margin-top: 0.5rem;
+}
+.hero-finding-icon { font-size: 1rem; flex-shrink: 0; color: var(--c-rose-lt); padding-top: 0.1rem; }
+.hero-finding em { color: var(--c-rose-lt); font-style: normal; font-weight: 600; }
+
+/* ── TL;DR STRIP ─────────────────────────────────────────── */
+.tldr {
+  background: var(--c-blue); color: #fff;
+  padding: 0.875rem 1.5rem; text-align: center;
+  font-family: var(--f-display); font-size: 0.9375rem; line-height: 1.5;
+}
+.tldr strong { font-weight: 700; }
+
+/* ── SECTION PRIMITIVES ──────────────────────────────────── */
+.section { padding: 5.5rem 1.5rem; }
+.section-alt { background: var(--c-white); }
+.section-dark { background: var(--c-ink); }
+.container { max-width: 860px; margin: 0 auto; }
+.container-wide { max-width: 1100px; margin: 0 auto; }
+.eyebrow {
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--c-blue);
+  margin-bottom: 0.5rem;
+}
+.section-dark .eyebrow { color: var(--c-blue-lt); }
+.section-dark .eyebrow-rose { color: var(--c-rose-lt); }
+h2 {
+  font-family: var(--f-display); font-size: clamp(1.625rem, 3vw, 2.375rem);
+  font-weight: 700; line-height: 1.15; color: var(--c-text); margin-bottom: 1.125rem;
+}
+.section-dark h2 { color: #fff; }
+.section-dark p { color: rgba(255,255,255,0.62); }
+h3 {
+  font-family: var(--f-display); font-size: 1.0625rem; font-weight: 600;
+  color: var(--c-text); margin-bottom: 0.5rem; line-height: 1.3;
+}
+
+/* ── ABSTRACT ────────────────────────────────────────────── */
+.abstract-body {
+  border-left: 3px solid var(--c-blue);
+  padding-left: 1.5rem;
+  font-size: 1.05rem; line-height: 1.82;
+}
+.abstract-body strong { color: var(--c-text); }
+
+/* ── PROBLEM / TRAP ──────────────────────────────────────── */
+.trap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-top: 2rem; }
+.trap-card { border-radius: 12px; padding: 1.5rem; }
+.trap-card-rose { background: rgba(220,38,38,0.075); border: 1px solid rgba(220,38,38,0.2); }
+.trap-card-blue { background: rgba(75,124,243,0.07); border: 1px solid rgba(75,124,243,0.22); }
+.trap-label {
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase; margin-bottom: 0.625rem;
+}
+.trap-label-rose { color: var(--c-rose-lt); }
+.trap-label-blue { color: #93C5FD; }
+.trap-card h3 { color: #fff; font-size: 1.0625rem; margin-bottom: 0.4rem; }
+.trap-card p { color: rgba(255,255,255,0.6); font-size: 0.9rem; font-family: var(--f-display); }
+.trap-metrics { margin-top: 1rem; }
+.trap-metric {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.375rem 0; border-top: 1px solid rgba(255,255,255,0.06);
+  font-family: var(--f-display); font-size: 0.8125rem;
+}
+.trap-metric-k { color: rgba(255,255,255,0.45); }
+.trap-metric-v { font-weight: 600; }
+.v-good { color: var(--c-green-lt); }
+.v-bad  { color: var(--c-rose-lt); }
+.v-blue { color: #93C5FD; }
+.insight-box {
+  background: rgba(75,124,243,0.09); border: 1px solid rgba(75,124,243,0.25);
+  border-radius: 10px; padding: 1.125rem 1.375rem; margin-top: 2rem;
+  font-family: var(--f-display); font-size: 0.9375rem;
+  color: rgba(255,255,255,0.78); line-height: 1.6;
+}
+.insight-box strong { color: var(--c-blue-lt); }
+
+/* ── FRAMEWORK ───────────────────────────────────────────── */
+.fw-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.125rem; margin-top: 2rem; }
+.fw-card {
+  background: var(--c-body); border: 1px solid var(--c-border);
+  border-radius: 12px; padding: 1.75rem 1.5rem; position: relative;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.fw-card:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.08); transform: translateY(-2px); }
+.fw-icon {
+  width: 42px; height: 42px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; margin-bottom: 1rem;
+}
+.fw-icon-amber { background: rgba(217,119,6,0.1); }
+.fw-icon-blue  { background: rgba(29,82,204,0.09); }
+.fw-icon-green { background: rgba(5,150,105,0.09); }
+.fw-card h3 { font-size: 1rem; margin-bottom: 0.375rem; }
+.fw-formula {
+  font-family: var(--f-mono); font-size: 0.7875rem;
+  background: var(--c-body); border: 1px solid var(--c-border);
+  border-radius: 6px; padding: 0.35rem 0.7rem;
+  display: inline-block; color: var(--c-blue); margin: 0.625rem 0;
+}
+.fw-card p { font-size: 0.89rem; line-height: 1.65; }
+.protocol-box {
+  background: var(--c-ink); border-radius: 14px; padding: 1.875rem;
+  margin-top: 2.5rem; color: rgba(255,255,255,0.72);
+}
+.protocol-label {
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--c-blue-lt);
+  margin-bottom: 1.125rem;
+}
+.protocol-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 1rem; align-items: center; }
+.protocol-card {
+  background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 10px; padding: 1.125rem 1.25rem;
+}
+.protocol-card-title { font-family: var(--f-display); font-weight: 600; color: #fff; margin-bottom: 0.375rem; font-size: 0.9375rem; }
+.protocol-card-body { font-family: var(--f-mono); font-size: 0.75rem; color: rgba(255,255,255,0.44); }
+.protocol-card-arrow { font-family: var(--f-display); font-size: 0.75rem; color: var(--c-blue-lt); margin-top: 0.625rem; }
+.protocol-plus { font-size: 1.375rem; color: rgba(255,255,255,0.2); text-align: center; font-family: var(--f-display); }
+.protocol-footer {
+  margin-top: 1.125rem; padding-top: 1rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  font-family: var(--f-mono); font-size: 0.7875rem;
+  color: rgba(255,255,255,0.38); line-height: 2;
+}
+.decision-rule { background: var(--c-body); border-radius: 8px; padding: 0.875rem 1rem; margin-top: 0.75rem; }
+.decision-row { display: flex; align-items: center; gap: 0.625rem; padding: 0.2rem 0; font-family: var(--f-display); font-size: 0.79rem; }
+.badge-true  { background: rgba(5,150,105,0.12); color: #059669; font-weight: 700; font-size: 0.6875rem; padding: 0.125rem 0.45rem; border-radius: 4px; flex-shrink:0; }
+.badge-false { background: rgba(220,38,38,0.1);  color: #DC2626; font-weight: 700; font-size: 0.6875rem; padding: 0.125rem 0.45rem; border-radius: 4px; flex-shrink:0; }
+.badge-unc   { background: rgba(107,114,128,0.1); color: #6B7280; font-weight: 700; font-size: 0.6875rem; padding: 0.125rem 0.45rem; border-radius: 4px; flex-shrink:0; }
+.decision-row span:last-child { color: var(--c-muted); }
+
+/* ── RESULTS TABLE ───────────────────────────────────────── */
+.table-wrap { overflow-x: auto; border: 1px solid var(--c-border); border-radius: 12px; margin-top: 2rem; }
+.results-table { width: 100%; border-collapse: collapse; font-size: 0.8375rem; }
+.results-table thead th {
+  background: var(--c-ink); color: rgba(255,255,255,0.62);
+  font-family: var(--f-display); font-weight: 600; font-size: 0.7rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.875rem 1rem; text-align: center; white-space: nowrap;
+}
+.results-table thead th:first-child { text-align: left; }
+.results-table tbody td {
+  padding: 0.825rem 1rem; text-align: center;
+  font-family: var(--f-display); font-size: 0.875rem;
+  color: var(--c-mid); border-top: 1px solid var(--c-border);
+}
+.results-table tbody td:first-child { text-align: left; font-weight: 600; color: var(--c-text); }
+.results-table tbody tr:hover td { background: #F9FAFB; }
+.model-chip { display: inline-flex; align-items: center; gap: 0.45rem; }
+.model-pip { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.cell-best { font-weight: 700; color: var(--c-text); }
+.cell-warn { color: var(--c-rose); }
+.vacuous-badge {
+  font-family: var(--f-display); font-size: 0.6375rem; font-weight: 700;
+  background: rgba(220,38,38,0.08); color: var(--c-rose);
+  border: 1px solid rgba(220,38,38,0.2); border-radius: 100px;
+  padding: 0.1rem 0.45rem; margin-left: 0.25rem; vertical-align: middle;
+}
+.table-note {
+  font-family: var(--f-display); font-size: 0.79rem; color: var(--c-muted);
+  margin-top: 0.875rem; line-height: 1.55;
+}
+.callout {
+  background: rgba(29,82,204,0.06); border-left: 3px solid var(--c-blue);
+  border-radius: 0 8px 8px 0; padding: 1rem 1.25rem; margin-top: 1.5rem;
+  font-family: var(--f-display); font-size: 0.9375rem; color: var(--c-mid); line-height: 1.6;
+}
+.callout strong { color: var(--c-text); }
+
+/* Comparison table */
+.cmp-wrap { overflow-x: auto; margin-top: 2.5rem; }
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.8375rem; }
+.cmp-table thead th {
+  font-family: var(--f-display); font-size: 0.6875rem; font-weight: 600;
+  color: var(--c-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.6rem 0.875rem; border-bottom: 2px solid var(--c-border); text-align: center;
+}
+.cmp-table thead th:first-child { text-align: left; }
+.cmp-table td {
+  padding: 0.575rem 0.875rem; border-bottom: 1px solid var(--c-border);
+  text-align: center; font-family: var(--f-display); font-size: 0.875rem;
+}
+.cmp-table td:first-child { text-align: left; color: var(--c-mid); }
+.cmp-table th.ours { color: var(--c-blue); font-weight: 700; }
+.cmp-table td.ours { background: rgba(29,82,204,0.04); }
+.ico-check { color: var(--c-green); font-size: 1rem; font-weight: 700; }
+.ico-cross { color: var(--c-rose); font-size: 1rem; }
+
+/* ── ABLATIONS ───────────────────────────────────────────── */
+.abl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.125rem; margin-top: 2rem; }
+.abl-card { border: 1px solid var(--c-border); border-radius: 12px; padding: 1.5rem; background: var(--c-body); }
+.abl-glyph {
+  font-family: var(--f-display); font-size: 2rem; font-weight: 700;
+  color: var(--c-blue-lt); opacity: 0.25; line-height: 1; margin-bottom: 0.25rem;
+}
+.abl-card h3 { font-size: 1rem; margin-bottom: 0.4rem; }
+.abl-card p { font-size: 0.875rem; color: var(--c-muted); line-height: 1.6; }
+.abl-stat {
+  display: inline-block; font-family: var(--f-mono); font-size: 0.775rem;
+  background: #EAECF3; border-radius: 5px; padding: 0.275rem 0.625rem;
+  margin-top: 0.625rem; color: var(--c-text);
+}
+.scale-box {
+  background: var(--c-white); border: 1px solid var(--c-border);
+  border-radius: 12px; padding: 1.5rem; margin-top: 2.5rem;
+}
+.scale-box-title { font-family: var(--f-display); font-size: 0.875rem; font-weight: 600; color: var(--c-text); margin-bottom: 1rem; }
+.scale-table { width: 100%; border-collapse: collapse; font-family: var(--f-display); font-size: 0.8125rem; }
+.scale-table th { padding: 0.45rem 0.75rem; border-bottom: 2px solid var(--c-border); color: var(--c-muted); font-weight: 600; text-align: center; }
+.scale-table th:first-child { text-align: left; }
+.scale-table td { padding: 0.45rem 0.75rem; border-bottom: 1px solid var(--c-border); text-align: center; }
+.scale-table td:first-child { text-align: left; color: var(--c-text); font-weight: 500; }
+.scale-table .delta { color: var(--c-muted); font-style: italic; }
+.scale-table .neg { color: var(--c-rose); font-weight: 600; }
+.scale-table .pos { color: var(--c-green); font-weight: 600; }
+
+/* ── GENERALIZATION ──────────────────────────────────────── */
+.gen-grid { display: grid; grid-template-columns: 300px 1fr; gap: 3rem; align-items: center; margin-top: 2rem; }
+.gen-stat {
+  background: var(--c-ink); border-radius: 16px; padding: 2.5rem 2rem;
+  text-align: center; color: #fff;
+}
+.gen-stat-num { font-family: var(--f-display); font-size: 3.75rem; font-weight: 700; color: var(--c-blue-lt); line-height: 1; }
+.gen-stat-unit { font-family: var(--f-display); font-size: 0.875rem; color: rgba(255,255,255,0.4); margin-top: 0.5rem; line-height: 1.4; }
+.gen-text h3 { font-size: 1.125rem; margin-bottom: 0.625rem; }
+.gen-text p { font-size: 0.9625rem; line-height: 1.78; }
+
+/* ── BIBTEX ──────────────────────────────────────────────── */
+.bibtex-wrapper { position: relative; margin-top: 1.5rem; }
+.bibtex-copy {
+  position: absolute; top: 0.875rem; right: 0.875rem; z-index: 2;
+  font-family: var(--f-display); font-size: 0.75rem; font-weight: 600;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.62); border-radius: 6px;
+  padding: 0.3rem 0.75rem; cursor: pointer; transition: all 0.18s;
+}
+.bibtex-copy:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.bibtex-copy.copied { background: rgba(5,150,105,0.2); color: var(--c-green-lt); border-color: rgba(5,150,105,0.35); }
+.bibtex-pre {
+  background: var(--c-ink); border-radius: 12px; padding: 1.5rem;
+  font-family: var(--f-mono); font-size: 0.8125rem;
+  color: rgba(255,255,255,0.7); line-height: 1.85;
+  overflow-x: auto; white-space: pre; display: block;
+}
+.bk { color: var(--c-blue-lt); }
+.bv { color: #A5F3FC; }
+
+/* ── FOOTER ──────────────────────────────────────────────── */
+.footer { background: var(--c-ink); padding: 3rem 1.5rem; text-align: center; }
+.footer-inner { max-width: 640px; margin: 0 auto; }
+.footer-logo { font-family: var(--f-display); font-size: 1.375rem; font-weight: 700; color: var(--c-blue-lt); margin-bottom: 0.375rem; }
+.footer-sub { font-family: var(--f-display); font-size: 0.8125rem; color: rgba(255,255,255,0.32); margin-bottom: 1.5rem; }
+.footer-links { display: flex; justify-content: center; gap: 1.75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.footer-links a { font-family: var(--f-display); font-size: 0.875rem; color: rgba(255,255,255,0.45); transition: color 0.15s; }
+.footer-links a:hover { color: var(--c-blue-lt); }
+.footer-copy { font-family: var(--f-display); font-size: 0.71875rem; color: rgba(255,255,255,0.2); }
+
+/* ── TOOLTIP ─────────────────────────────────────────────── */
+#tip {
+  position: fixed; display: none; z-index: 999; pointer-events: none;
+  background: rgba(10,16,32,0.96); border: 1px solid rgba(255,255,255,0.11);
+  border-radius: 8px; padding: 10px 13px; min-width: 160px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45); transition: opacity 0.14s;
+  font-family: var(--f-display); font-size: 12px; color: rgba(255,255,255,0.8);
+  line-height: 1.55;
+}
+#tip-name { font-weight: 700; margin-bottom: 4px; }
+#tip-body { color: rgba(255,255,255,0.6); }
+
+/* ── RESPONSIVE ──────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  .hero-viz { display: none; }
+  .hero-finding { grid-column: auto; }
+  .trap-grid { grid-template-columns: 1fr; }
+  .fw-grid { grid-template-columns: 1fr 1fr; }
+  .abl-grid { grid-template-columns: 1fr; }
+  .gen-grid { grid-template-columns: 1fr; }
+  .protocol-grid { grid-template-columns: 1fr; }
+  .protocol-plus { display: none; }
+  .nav-links { display: none; }
+}
+@media (max-width: 560px) {
+  .fw-grid { grid-template-columns: 1fr; }
+  .hero-title { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" aria-label="Site navigation">
+  <div class="nav-inner">
+    <span class="nav-logo">CUC</span>
+    <div class="nav-links">
+      <a href="#abstract">Abstract</a>
+      <a href="#framework">Framework</a>
+      <a href="#results">Results</a>
+      <a href="#ablations">Ablations</a>
+      <a href="#bibtex">Cite</a>
+    </div>
+    <div class="nav-acts">
+      <a href="https://pmlrbd.github.io/auc.ml/" class="nav-btn nav-btn-ghost" target="_blank" rel="noopener">💻 Code</a>
+      <a href="#bibtex" class="nav-btn nav-btn-solid">📋 BibTeX</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-wm" aria-hidden="true">c(φ)&nbsp;=&nbsp;p(φ)&nbsp;+&nbsp;p(¬φ)</div>
+  <div class="hero-inner">
+
+    <!-- Text column -->
+    <div class="hero-text">
+      <div class="hero-badge"><span class="hero-badge-dot"></span>EMM-QA Workshop · ICML 2026 · Seoul</div>
+      <h1 class="hero-title" id="hero-title">Coherence<br>Under Commitment</h1>
+      <p class="hero-subtitle">Probing Generalization and Vacuous Memorization<br>in LLM Logical Reasoning</p>
+      <div class="hero-authors">
+        <span class="hero-author">Noor Islam S. Mohammad<sup>1</sup></span>
+        <span class="hero-author-sep">·</span>
+        <span class="hero-author">Mahmudul Hasan<sup>2</sup></span>
+      </div>
+      <p class="hero-affil">
+        <sup>1</sup>&thinsp;Istanbul Technical University &nbsp;&nbsp;
+        <sup>2</sup>&thinsp;Deakin University, Geelong
+      </p>
+      <div class="hero-btns">
+        <a href="#" class="hero-btn hero-btn-primary">📄 Paper (PMLR)</a>
+        <a href="https://pmlrbd.github.io/auc.ml/" class="hero-btn hero-btn-outline" target="_blank" rel="noopener">💻 Code &amp; Data</a>
+        <a href="#bibtex" class="hero-btn hero-btn-outline">📋 BibTeX</a>
+      </div>
+    </div>
+
+    <!-- Frontier viz column -->
+    <div class="hero-viz" aria-hidden="true">
+      <div class="hero-viz-title">Coherence–Commitment Frontier · FOLIO v0.0 (n = 204)</div>
+      <svg id="frontier-svg" viewBox="0 0 570 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scatter plot showing four LLMs on the coherence-commitment frontier"></svg>
+    </div>
+
+    <!-- Full-width callout -->
+    <div class="hero-finding" role="note">
+      <span class="hero-finding-icon" aria-hidden="true">⚠</span>
+      <span>Under standard coherence-only evaluation, Qwen2.5-3B ranks <em>first</em> (E[v<sub>neg</sub>] = 0.025). CUC reveals this as vacuous: the model abstains on <em>92.6% of examples</em> — providing no actionable output.</span>
+    </div>
+
+  </div>
+</section>
+
+<!-- TL;DR -->
+<div class="tldr">
+  <strong>TL;DR</strong> — Standard coherence metrics are gamed by abstention. CUC jointly measures negation-consistency <em>and</em> epistemic commitment, exposing a sharp evaluation frontier that single-metric protocols miss entirely.
+</div>
+
+<!-- ABSTRACT -->
+<section id="abstract" class="section section-alt">
+  <div class="container">
+    <p class="eyebrow">Abstract</p>
+    <h2>The Coherence Evaluation Trap</h2>
+    <div class="abstract-body">
+      <p>Large language models deployed for logical reasoning in knowledge-intensive domains exhibit a subtle but critical failure: <strong>coherence can be vacuously achieved through systematic abstention</strong>. A model that withholds commitment to either entailment or refutation satisfies negation consistency while providing no utility.</p>
+      <p>We introduce <strong>Coherence Under Commitment (CUC)</strong>, a dual-query evaluation paradigm that jointly measures consistency and decisiveness. CUC contributes three innovations: a <strong>commitment score</strong> c(φ) = p(φ) + p(¬φ) quantifying probability mass allocated to decisive outcomes; a <strong>deterministic elicitation protocol</strong> via normalized YES/NO log probabilities; and a <strong>3-way decision framework</strong> (TRUE/FALSE/UNCERTAIN) operationalizing the coherence-commitment tradeoff into metrics.</p>
+      <p>Experiments on four open-weight LLMs (1B–3B) across 204 FOLIO examples expose a sharp frontier. Qwen2.5-3B achieves near-zero contradiction (E[v<sub>neg</sub>] = 0.025) but only 7.4% coverage, while TinyLlama-1.1B reaches 79.4% coverage with violations on <em>every single example</em>. Coherence-only evaluation would rank the abstaining model first — CUC exposes this as vacuous. The frontier generalizes to LOGIQA v2 (ρ = 0.97) and is provably scale-invariant.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section section-dark" id="problem">
+  <div class="container">
+    <p class="eyebrow eyebrow-rose">The Problem</p>
+    <h2>When Coherence Is a Lie</h2>
+    <p>Negation consistency — not simultaneously affirming φ and ¬φ — is a minimal desideratum. But it can be trivially satisfied: a model that assigns near-equal, low probability to all outcomes achieves zero violations without doing any reasoning. Standard evaluation is blind to this.</p>
+    <div class="trap-grid">
+      <div class="trap-card trap-card-rose">
+        <p class="trap-label trap-label-rose">⚠ Ranked #1 by standard coherence eval</p>
+        <h3>Qwen2.5-3B · The Abstainer</h3>
+        <p>Near-zero contradiction because it assigns negligible probability to <em>all</em> outcomes. It isn't reasoning — it's refusing to answer.</p>
+        <div class="trap-metrics">
+          <div class="trap-metric"><span class="trap-metric-k">E[v<sub>neg</sub>] (violations)</span><span class="trap-metric-v v-good">0.025 ↓</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">Coverage (predictions made)</span><span class="trap-metric-v v-bad">7.4% ↓</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">E[c] mean commitment</span><span class="trap-metric-v v-bad">0.115 ↓</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">Examples abstained on</span><span class="trap-metric-v v-bad">&gt;9 in every 10</span></div>
+        </div>
+      </div>
+      <div class="trap-card trap-card-blue">
+        <p class="trap-label trap-label-blue">⚠ Ranked #4 by standard coherence eval</p>
+        <h3>TinyLlama-1.1B · The Overcommitter</h3>
+        <p>Violates probability axioms on every single example. It doesn't reason — it affirms indiscriminately, assigning 169.8% total probability mass.</p>
+        <div class="trap-metrics">
+          <div class="trap-metric"><span class="trap-metric-k">Coverage (predictions made)</span><span class="trap-metric-v v-blue">79.4% ↑</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">E[v<sub>neg</sub>] (violations)</span><span class="trap-metric-v v-bad">0.698 ↑</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">% examples with any violation</span><span class="trap-metric-v v-bad">100%</span></div>
+          <div class="trap-metric"><span class="trap-metric-k">E[c] mean commitment</span><span class="trap-metric-v v-bad">1.698 (169.8% mass)</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="insight-box">
+      <strong>Key algebraic identity:</strong> v<sub>neg</sub>(φ) = max(0, c(φ) − 1). Any model with c(φ) ≤ 1 achieves <em>zero</em> negation violations — regardless of reasoning quality. Low commitment is sufficient for zero violation. This is the trap that standard evaluation cannot see.
+    </div>
+  </div>
+</section>
+
+<!-- FRAMEWORK -->
+<section id="framework" class="section">
+  <div class="container-wide">
+    <p class="eyebrow">Method</p>
+    <h2>Coherence Under Commitment</h2>
+    <p style="max-width:620px">Three interconnected innovations that jointly determine whether a model is <em>usefully</em> coherent — not merely apparently so.</p>
+    <div class="fw-grid">
+
+      <div class="fw-card">
+        <div class="fw-icon fw-icon-amber" aria-hidden="true">🎯</div>
+        <h3>Commitment Score</h3>
+        <div class="fw-formula">c(φ) = p(φ) + p(¬φ)</div>
+        <p>Measures total probability mass allocated to decisive outcomes. When c(φ) ≪ 1, the model treats the query as unknown — regardless of apparent coherence. The first metric designed specifically to detect vacuous coherence.</p>
+      </div>
+
+      <div class="fw-card">
+        <div class="fw-icon fw-icon-blue" aria-hidden="true">🔬</div>
+        <h3>Deterministic Elicitation</h3>
+        <div class="fw-formula">p(x)&nbsp;=&nbsp;exp(log&nbsp;P(YES|x))&nbsp;/&nbsp;Σ</div>
+        <p>Normalized log-probabilities over YES/NO tokens. Fully reproducible: identical inputs produce identical outputs across all runs. Requires <strong>exactly 2 forward passes</strong> per example, no sampling, no decoding variance.</p>
+      </div>
+
+      <div class="fw-card">
+        <div class="fw-icon fw-icon-green" aria-hidden="true">⚖️</div>
+        <h3>3-way Decision Framework</h3>
+        <p style="margin-bottom:0.375rem">Structured rule with confidence threshold τ and margin δ (default: τ = 0.60, δ = 0.10):</p>
+        <div class="decision-rule">
+          <div class="decision-row"><span class="badge-true">TRUE</span><span>if p(φ) ≥ τ and p(φ) ≥ p(¬φ) + δ</span></div>
+          <div class="decision-row"><span class="badge-false">FALSE</span><span>if p(¬φ) ≥ τ and p(¬φ) ≥ p(φ) + δ</span></div>
+          <div class="decision-row"><span class="badge-unc">UNCERTAIN</span><span>otherwise</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Dual-query protocol -->
+    <div class="protocol-box">
+      <div class="protocol-label">Dual-Query Evaluation Protocol</div>
+      <div class="protocol-grid">
+        <div class="protocol-card">
+          <div class="protocol-card-title">Query Q<sub>φ</sub></div>
+          <div class="protocol-card-body">Is φ logically entailed by P?<br>Answer YES or NO.</div>
+          <div class="protocol-card-arrow">→ Extract p(φ) via log P(YES | Q<sub>φ</sub>)</div>
+        </div>
+        <div class="protocol-plus" aria-hidden="true">+</div>
+        <div class="protocol-card">
+          <div class="protocol-card-title">Query Q<sub>¬φ</sub></div>
+          <div class="protocol-card-body">Is ¬φ logically entailed by P?<br>Answer YES or NO.</div>
+          <div class="protocol-card-arrow">→ Extract p(¬φ) via log P(YES | Q<sub>¬φ</sub>)</div>
+        </div>
+      </div>
+      <div class="protocol-footer">c(φ) = p(φ) + p(¬φ) &nbsp;|&nbsp; v<sub>neg</sub>(φ) = max(0, c(φ) − 1) &nbsp;|&nbsp; 2 forward passes total &nbsp;|&nbsp; no architectural modification required</div>
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS -->
+<section id="results" class="section section-alt">
+  <div class="container-wide">
+    <p class="eyebrow">Results</p>
+    <h2>The Frontier Exposed</h2>
+    <p style="max-width:660px">FOLIO v0.0 validation set, 204 examples, four open-weight LLMs spanning 1B–3B parameters. <strong>Accuracy differs by at most 0.098 across all models</strong> — yet commitment and violation span an order of magnitude.</p>
+
+    <div class="table-wrap">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Acc ↑</th>
+            <th>Coverage ↑</th>
+            <th>Acc<sub>cov</sub> ↑</th>
+            <th>E[c] ↑</th>
+            <th>E[v<sub>neg</sub>] ↓</th>
+            <th>%v<sub>neg</sub>&gt;0 ↓</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="model-chip"><span class="model-pip" style="background:#FB923C"></span>Phi-2 (2.7B)</span></td>
+            <td class="cell-best">0.441</td><td>0.417</td><td>0.565</td><td>1.164</td><td>0.195</td><td class="cell-warn">0.789</td>
+          </tr>
+          <tr>
+            <td><span class="model-chip"><span class="model-pip" style="background:#FCD34D"></span>Qwen2.5-1.5B</span></td>
+            <td>0.402</td><td>0.309</td><td>0.508</td><td>0.674</td><td>0.166</td><td>0.461</td>
+          </tr>
+          <tr>
+            <td>
+              <span class="model-chip"><span class="model-pip" style="background:#A78BFA"></span>Qwen2.5-3B</span>
+              <span class="vacuous-badge">⚠ Vacuous</span>
+            </td>
+            <td>0.382</td><td class="cell-warn">0.074</td><td class="cell-best">0.800</td><td class="cell-warn">0.115</td><td class="cell-best">0.025</td><td class="cell-best">0.064</td>
+          </tr>
+          <tr>
+            <td><span class="model-chip"><span class="model-pip" style="background:#60A5FA"></span>TinyLlama-1.1B</span></td>
+            <td class="cell-warn">0.343</td><td class="cell-best">0.794</td><td class="cell-warn">0.346</td><td class="cell-best">1.698</td><td class="cell-warn">0.698</td><td class="cell-warn">1.000</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">Table 1. CUC on FOLIO v0.0 (n = 204). ↑ higher is better, ↓ lower is better. Bold values mark the column extremum — these should be read in conjunction, not in isolation. Default thresholds: τ = 0.60, δ = 0.10. All values carry 95% bootstrap CIs (B = 1,000, seed = 42).</p>
+
+    <div class="callout">
+      <strong>The ranking inversion:</strong> Under accuracy alone, Qwen2.5-3B (0.382) and TinyLlama (0.343) differ by just 0.039 points — despite maximally opposite behaviors. Under coherence-only eval, Qwen2.5-3B leads by <strong>6.6×</strong> on E[v<sub>neg</sub>] — an advantage that collapses to 7.4% vs. 79.4% coverage once commitment is accounted for. CUC resolves both distortions simultaneously.
+    </div>
+
+    <!-- Framework comparison -->
+    <h3 style="margin-top:3rem;font-size:1.1875rem">CUC vs. Prior Evaluation Paradigms</h3>
+    <div class="cmp-wrap">
+      <table class="cmp-table">
+        <thead>
+          <tr>
+            <th style="text-align:left">Property</th>
+            <th>Accuracy</th><th>ECE</th><th>Sel. Pred.</th><th>SelfCheck</th>
+            <th class="ours">CUC (ours)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Detects vacuous coherence via abstention</td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-check">✓</span></td><td><span class="ico-cross">✗</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+          <tr><td>Detects overcommitment (contradiction)</td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-check">✓</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+          <tr><td>Sensitive to ECE inflation via filtering</td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+          <tr><td>No architectural modification required</td><td><span class="ico-check">✓</span></td><td><span class="ico-check">✓</span></td><td><span class="ico-check">✓</span></td><td><span class="ico-check">✓</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+          <tr><td>Measures cross-query logical consistency</td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+          <tr><td>Fully deterministic across runs</td><td><span class="ico-check">✓</span></td><td><span class="ico-check">✓</span></td><td><span class="ico-cross">✗</span></td><td><span class="ico-cross">✗</span></td><td class="ours"><span class="ico-check">✓</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ABLATIONS -->
+<section id="ablations" class="section">
+  <div class="container-wide">
+    <p class="eyebrow">Ablations</p>
+    <h2>Four Targeted Ablations</h2>
+    <p>All four ablations confirm the frontier is robust — not a calibration artifact, not a surface effect of keyword choice, not an artifact of model scale alone.</p>
+    <div class="abl-grid">
+      <div class="abl-card">
+        <div class="abl-glyph">τ δ</div>
+        <h3>Threshold Sensitivity</h3>
+        <p>Tested 8 (τ, δ) configurations from (0.50, 0.05) to (0.80, 0.20). The coverage–accuracy tradeoff is monotone across all settings. <strong>Frontier model rankings never change.</strong></p>
+        <span class="abl-stat">ρ = 1.0 across all threshold configs</span>
+      </div>
+      <div class="abl-card">
+        <div class="abl-glyph">A?</div>
+        <h3>Elicitation Format</h3>
+        <p>YES/NO vs. True/False vs. Entailed/Refuted. Absolute commitment shifts by up to 0.15 across formats. <strong>Rank ordering is perfectly preserved (ρ = 1.0).</strong> Format affects magnitude only, never relative position.</p>
+        <span class="abl-stat">ρ = 1.0 across YES/NO, T/F, Ent/Ref</span>
+      </div>
+      <div class="abl-card">
+        <div class="abl-glyph">∩</div>
+        <h3>Component Analysis</h3>
+        <p>Coherence-only rewards abstention (ranks Qwen-3B first). Commitment-only rewards overcommitment (ranks TinyLlama first). Coverage-only ignores prediction quality. <strong>Only CUC detects both failure modes and ranks correctly.</strong></p>
+        <span class="abl-stat">CUC: sole framework with correct ranking</span>
+      </div>
+      <div class="abl-card">
+        <div class="abl-glyph">↑s</div>
+        <h3>Scale Effects</h3>
+        <p>Scaling Qwen2.5 from 1.5B to 3B reduces commitment by 83% and coverage by 23.5 points with negligible accuracy change (−0.020). <strong>The larger model learns to hedge, not to reason.</strong></p>
+        <span class="abl-stat">−83% commitment, −23.5 pp coverage</span>
+      </div>
+    </div>
+
+    <div class="scale-box">
+      <div class="scale-box-title">Scale Effects Within the Qwen2.5 Family (Table 6)</div>
+      <div style="overflow-x:auto">
+        <table class="scale-table">
+          <thead>
+            <tr><th>Model</th><th>E[c] ↑</th><th>E[v<sub>neg</sub>] ↓</th><th>Coverage ↑</th><th>Acc</th><th>Acc<sub>cov</sub></th><th>ECE<sub>cov</sub></th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Qwen2.5-1.5B</td><td>0.674</td><td>0.166</td><td>0.309</td><td>0.402</td><td>0.508</td><td>0.187</td></tr>
+            <tr><td>Qwen2.5-3B</td><td><span style="color:var(--c-rose)">0.115</span></td><td><span style="color:var(--c-green)">0.025</span></td><td><span style="color:var(--c-rose)">0.074</span></td><td>0.382</td><td><span style="color:var(--c-green)">0.800</span></td><td>0.089</td></tr>
+            <tr class="delta"><td>Δ (3B − 1.5B)</td><td class="neg">−0.559</td><td class="pos">−0.141</td><td class="neg">−0.235</td><td style="color:var(--c-muted)">−0.020</td><td class="pos">+0.292</td><td class="pos">−0.098</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:0.75rem;font-family:var(--f-display);font-size:0.79rem;color:var(--c-muted)">Standard evaluation would report the 3B model as unambiguously superior (4.9× lower violation, 2.1× lower ECE). CUC reveals these gains are purchased at an 83% reduction in coverage — the model learns aggressive abstention, not better reasoning.</p>
+    </div>
+  </div>
+</section>
+
+<!-- GENERALIZATION -->
+<section class="section section-alt" id="generalization">
+  <div class="container-wide">
+    <p class="eyebrow">Generalization</p>
+    <h2>The Frontier Holds Across Benchmarks</h2>
+    <div class="gen-grid">
+      <div class="gen-stat">
+        <div class="gen-stat-num">ρ=0.97</div>
+        <div class="gen-stat-unit">Spearman rank correlation<br>FOLIO vs. LOGIQA v2<br><em style="font-size:0.75rem;color:rgba(255,255,255,0.25)">(p &lt; 0.05, n = 304)</em></div>
+      </div>
+      <div class="gen-text">
+        <h3>Cross-Dataset Validation · LOGIQA v2</h3>
+        <p>All four original models were evaluated on the LOGIQA v2 test split (304 examples) using rule-based linguistic negation — since LOGIQA lacks FOLIO's formally verified negation fields. The frontier structure is qualitatively preserved across datasets: Qwen2.5-3B remains the lowest-commitment model (Coverage = 6.9%) and TinyLlama-1.1B remains universally violated.</p>
+        <p>Near-perfect Spearman rank correlation (ρ = 0.97) with FOLIO-derived frontier orderings confirms that frontier positions are not artifacts of benchmark label distribution or premise style.</p>
+        <h3 style="margin-top:1.25rem">Scale Extension · Llama-3 Family</h3>
+        <p>Scaling Llama-3.2-1B → Llama-3.1-8B within a second model family replicates the hedging-under-scale pattern: commitment drops 39% (0.841 → 0.529) and coverage drops 17.3 points (56.9% → 39.6%) with negligible accuracy change (−0.014). The core finding is not specific to the Qwen2.5 training pipeline.</p>
+        <h3 style="margin-top:1.25rem">Theoretical Scale-Invariance</h3>
+        <p>Theorem B.1 establishes that the frontier v<sub>neg</sub> = max(0, c − 1) is a direct consequence of the algebraic identity between c(φ) and v<sub>neg</sub>(φ) — no model, at any scale or architecture, can escape below it. Theorem B.3 proves that perfect coherence is achievable without any reasoning ability simply by assigning p(φ) = p(¬φ) ≤ 0.5. Both results hold at 1B and 100B parameters identically.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BIBTEX -->
+<section id="bibtex" class="section">
+  <div class="container">
+    <p class="eyebrow">Citation</p>
+    <h2>Cite This Work</h2>
+    <p style="color:var(--c-mid)">If you use CUC or the evaluation toolkit in your research, please cite:</p>
+    <div class="bibtex-wrapper">
+      <button class="bibtex-copy" id="copy-btn" onclick="doCopy()" aria-label="Copy BibTeX to clipboard">Copy</button>
+      <pre class="bibtex-pre" id="bib-block"><span class="bk">@inproceedings</span>{mohammad2026cuc,
+  <span class="bk">title</span>        = {<span class="bv">Coherence Under Commitment: Probing Generalization and
+                   Vacuous Memorization in LLM Logical Reasoning</span>},
+  <span class="bk">author</span>       = {<span class="bv">Mohammad, Noor Islam S. and Hasan, Mahmudul</span>},
+  <span class="bk">booktitle</span>    = {<span class="bv">Proceedings of the Efficient Multimodal Question Answering
+                   Workshop at the 43rd International Conference on
+                   Machine Learning (ICML 2026)</span>},
+  <span class="bk">series</span>       = {<span class="bv">Proceedings of Machine Learning Research</span>},
+  <span class="bk">volume</span>       = {<span class="bv">306</span>},
+  <span class="bk">year</span>         = {<span class="bv">2026</span>},
+  <span class="bk">address</span>      = {<span class="bv">Seoul, South Korea</span>},
+  <span class="bk">url</span>          = {<span class="bv">https://pmlrbd.github.io/auc.ml/</span>},
+  <span class="bk">organization</span> = {<span class="bv">PMLR</span>}
+}</pre>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-logo">CUC</div>
+    <div class="footer-sub">Coherence Under Commitment · EMM-QA Workshop @ ICML 2026 · Seoul, South Korea</div>
+    <div class="footer-links">
+      <a href="#">📄 Paper (PMLR 306)</a>
+      <a href="https://pmlrbd.github.io/auc.ml/" target="_blank" rel="noopener">💻 Code &amp; Toolkit</a>
+      <a href="mailto:islam23@itu.edu.tr">✉ Contact</a>
+      <a href="#bibtex">📋 BibTeX</a>
+    </div>
+    <div class="footer-copy">© 2026 Noor Islam S. Mohammad &amp; Mahmudul Hasan · Istanbul Technical University · Deakin University</div>
+  </div>
+</footer>
+
+<!-- Tooltip -->
+<div id="tip" role="tooltip">
+  <div id="tip-name"></div>
+  <div id="tip-body"></div>
+</div>
+
+<script>
+/* ── FRONTIER SVG ─────────────────────────────────────────── */
+(function() {
+  const svg = document.getElementById('frontier-svg');
+  if (!svg) return;
+  const NS = 'http://www.w3.org/2000/svg';
+
+  /* Viewport layout */
+  const VW = 570, VH = 310;
+  const ml = 58, mr = 24, mt = 18, mb = 48;
+  const pw = VW - ml - mr;   // 488
+  const ph = VH - mt - mb;   // 244
+
+  /* Scale functions */
+  const xs = c => ml + (c / 2.0) * pw;
+  const ys = v => mt + ph * (1 - v);
+
+  /* Helper: create SVG element with attrs */
+  const el = (tag, attrs) => {
+    const e = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
+    return e;
+  };
+  const tx = (x, y, text, attrs) => {
+    const e = el('text', { x, y, ...attrs });
+    e.textContent = text;
+    return e;
+  };
+
+  /* Grid lines */
+  [0, 0.25, 0.5, 0.75, 1.0].forEach(v => {
+    svg.appendChild(el('line', {
+      x1: ml, y1: ys(v), x2: ml + pw, y2: ys(v),
+      stroke: '#1A2840', 'stroke-width': 1
+    }));
+    svg.appendChild(tx(ml - 7, ys(v) + 4, v.toFixed(2), {
+      'text-anchor': 'end', 'font-size': 9.5,
+      'font-family': 'JetBrains Mono, monospace', fill: '#3A5070'
+    }));
+  });
+  [0, 0.5, 1.0, 1.5, 2.0].forEach(c => {
+    svg.appendChild(el('line', {
+      x1: xs(c), y1: mt, x2: xs(c), y2: mt + ph,
+      stroke: '#1A2840', 'stroke-width': 1
+    }));
+    svg.appendChild(tx(xs(c), mt + ph + 14, c.toFixed(1), {
+      'text-anchor': 'middle', 'font-size': 9.5,
+      'font-family': 'JetBrains Mono, monospace', fill: '#3A5070'
+    }));
+  });
+
+  /* Axes */
+  svg.appendChild(el('line', { x1: ml, y1: mt, x2: ml, y2: mt + ph, stroke: '#3A5070', 'stroke-width': 1.5 }));
+  svg.appendChild(el('line', { x1: ml, y1: mt + ph, x2: ml + pw, y2: mt + ph, stroke: '#3A5070', 'stroke-width': 1.5 }));
+
+  /* X axis label */
+  svg.appendChild(tx(ml + pw / 2, VH - 4,
+    'Commitment  c(φ) = p(φ) + p(¬φ)', {
+      'text-anchor': 'middle', 'font-size': 9.5,
+      'font-family': 'JetBrains Mono, monospace', fill: '#4B6485'
+    }));
+
+  /* Y axis label (rotated) */
+  const yl = el('text', {
+    transform: `rotate(-90, 13, ${mt + ph / 2})`,
+    'text-anchor': 'middle', 'font-size': 9.5,
+    'font-family': 'JetBrains Mono, monospace', fill: '#4B6485',
+    x: 13, y: mt + ph / 2 + 4
+  });
+  yl.textContent = 'Violation  vₙₑg(φ)';
+  svg.appendChild(yl);
+
+  /* Frontier dashed line — appears with fade */
+  const frontier = el('path', {
+    d: `M ${xs(0)} ${ys(0)} L ${xs(1)} ${ys(0)} L ${xs(2)} ${ys(1)}`,
+    stroke: '#4B7CF3', 'stroke-width': 2,
+    'stroke-dasharray': '8,4', fill: 'none', opacity: 0
+  });
+  svg.appendChild(frontier);
+  setTimeout(() => { frontier.style.transition = 'opacity 0.7s'; frontier.setAttribute('opacity', 0.72); }, 250);
+
+  /* Frontier equation label */
+  const eq = el('text', {
+    x: xs(1.38), y: ys(0.33),
+    'font-size': 9, 'font-family': 'JetBrains Mono, monospace', fill: '#4B7CF3',
+    transform: `rotate(-27, ${xs(1.38)}, ${ys(0.33)})`, opacity: 0
+  });
+  eq.textContent = 'vₙₑg = max(0, c−1)';
+  svg.appendChild(eq);
+  setTimeout(() => { eq.style.transition = 'opacity 0.5s'; eq.setAttribute('opacity', 0.68); }, 850);
+
+  /* Models data */
+  const models = [
+    { id: 'q3b',  name: 'Qwen2.5-3B',     short: 'Qwen-3B',    c: 0.115, v: 0.025, cov: '7.4%',  Evneg: '0.025', color: '#A78BFA', note: 'Vacuous Coherence', dx: 10, dy: -12 },
+    { id: 'q15b', name: 'Qwen2.5-1.5B',   short: 'Qwen-1.5B',  c: 0.674, v: 0.166, cov: '30.9%', Evneg: '0.166', color: '#FCD34D', note: 'Selective Abstainer', dx: -68, dy: -14 },
+    { id: 'phi',  name: 'Phi-2 (2.7B)',    short: 'Phi-2',      c: 1.164, v: 0.195, cov: '41.7%', Evneg: '0.195', color: '#FB923C', note: 'Intermediate',       dx: 10, dy: -14 },
+    { id: 'tiny', name: 'TinyLlama-1.1B',  short: 'TinyLlama',  c: 1.698, v: 0.698, cov: '79.4%', Evneg: '0.698', color: '#60A5FA', note: 'Overcommitted',       dx: -85, dy: 16 },
+  ];
+
+  const tip = document.getElementById('tip');
+  const tipName = document.getElementById('tip-name');
+  const tipBody = document.getElementById('tip-body');
+
+  models.forEach((m, i) => {
+    const cx = xs(m.c), cy = ys(m.v);
+    const delay = 600 + i * 380;
+
+    /* Outer pulse ring */
+    const ring = el('circle', { cx, cy, r: 8, fill: 'none', stroke: m.color, 'stroke-width': 1, opacity: 0 });
+    svg.appendChild(ring);
+    let rAnim, rScale = 1, rGrow = true;
+    const pulseRing = () => {
+      rGrow ? (rScale += 0.025) : (rScale -= 0.025);
+      if (rScale > 2.2) rGrow = false;
+      if (rScale < 1.0) rGrow = true;
+      ring.setAttribute('r', (7 * rScale).toFixed(1));
+      ring.setAttribute('opacity', Math.max(0, (2.2 - rScale) / 1.5 * 0.28).toFixed(2));
+      rAnim = requestAnimationFrame(pulseRing);
+    };
+    setTimeout(() => {
+      ring.style.transition = 'opacity 0.4s';
+      ring.setAttribute('opacity', 0.28);
+      pulseRing();
+    }, delay - 100);
+
+    /* Main dot */
+    const dot = el('circle', { cx, cy, r: 6.5, fill: m.color, opacity: 0, cursor: 'pointer' });
+    svg.appendChild(dot);
+    setTimeout(() => { dot.style.transition = 'opacity 0.45s'; dot.setAttribute('opacity', 1); }, delay);
+
+    /* Hover events */
+    dot.addEventListener('mouseenter', () => { dot.setAttribute('r', 8.5); });
+    dot.addEventListener('mouseleave', () => {
+      dot.setAttribute('r', 6.5);
+      tip.style.display = 'none';
+    });
+    dot.addEventListener('mousemove', e => {
+      tipName.textContent = m.name;
+      tipName.style.color = m.color;
+      tipBody.innerHTML = `Coverage: <strong>${m.cov}</strong><br>E[v<sub>neg</sub>]: <strong>${m.Evneg}</strong><br><span style="opacity:0.6;font-size:11px">${m.note}</span>`;
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY - 12) + 'px';
+      tip.style.display = 'block';
+      tip.style.opacity = 1;
+    });
+
+    /* Label */
+    const lbl = el('text', {
+      x: cx + m.dx, y: cy + m.dy,
+      'font-size': 10.5, 'font-family': 'Space Grotesk, sans-serif',
+      fill: m.color, 'font-weight': 600, opacity: 0
+    });
+    lbl.textContent = m.short;
+    svg.appendChild(lbl);
+    setTimeout(() => { lbl.style.transition = 'opacity 0.4s'; lbl.setAttribute('opacity', 1); }, delay + 180);
+  });
+})();
+
+/* ── TOOLTIP GLOBAL CLEANUP ──────────────────────────────── */
+document.addEventListener('scroll', () => {
+  const tip = document.getElementById('tip');
+  if (tip) tip.style.display = 'none';
+}, { passive: true });
+
+/* ── COPY BIBTEX ─────────────────────────────────────────── */
+function doCopy() {
+  const bibtex = `@inproceedings{mohammad2026cuc,
+  title        = {Coherence Under Commitment: Probing Generalization and
+                   Vacuous Memorization in LLM Logical Reasoning},
+  author       = {Mohammad, Noor Islam S. and Hasan, Mahmudul},
+  booktitle    = {Proceedings of the Efficient Multimodal Question Answering
+                   Workshop at the 43rd International Conference on
+                   Machine Learning (ICML 2026)},
+  series       = {Proceedings of Machine Learning Research},
+  volume       = {306},
+  year         = {2026},
+  address      = {Seoul, South Korea},
+  url          = {https://pmlrbd.github.io/auc.ml/},
+  organization = {PMLR}
+}`;
+  const btn = document.getElementById('copy-btn');
+  navigator.clipboard.writeText(bibtex).then(() => {
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2200);
+  }).catch(() => { btn.textContent = 'Copy failed'; });
+}
+
+/* ── SMOOTH SCROLL ───────────────────────────────────────── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.getElementById(a.getAttribute('href').slice(1));
+    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  });
+});
+
+/* ── NAV ACTIVE STATE ────────────────────────────────────── */
+const navLinks = document.querySelectorAll('.nav-links a');
+const sections = document.querySelectorAll('section[id]');
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(a => a.style.color = '');
+      const active = document.querySelector(`.nav-links a[href="#${entry.target.id}"]`);
+      if (active) active.style.color = '#fff';
+    }
+  });
+}, { threshold: 0.4 });
+sections.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
